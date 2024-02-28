@@ -8,6 +8,7 @@ use image;
 use image::{DynamicImage, GenericImage, ImageBuffer, ImageFormat, Rgb, RgbImage};
 use leptess::LepTess;
 use regex::Regex;
+use xcap::Monitor;
 use crate::UpdateUI;
 
 const MAX_TRIES:i32 = 3;
@@ -18,9 +19,12 @@ pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>) {
     let _ = thread::spawn({
         move || {
             thread::sleep(Duration::new(0, SCREENSHOT_DELAY_NS));
+            let binding = xcap::Monitor::all().unwrap();
+            let monitor = binding.first().unwrap();
             for i in 0.. MAX_TRIES{
-                match capture(i) {
-                    None => {}
+                let start = Instant::now();
+                match capture(i,monitor) {
+                    None => {println!("capture failed");}
                     Some(delay) => {
                         //TODO display
                         println!("Delay: {:?}",delay);
@@ -28,16 +32,16 @@ pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>) {
                         break;
                     }
                 }
+                println!("screenshot to time: {:?}", start.elapsed());
             }
         }
     });
 }
 
 
-fn capture(tries:i32) -> Option<Duration> {
+fn capture(tries:i32,monitor: &Monitor) -> Option<Duration> {
     let start = Instant::now();
-    let monitors = xcap::Monitor::all().unwrap();
-    let image = monitors.first().unwrap().capture_image().unwrap();
+    let image =monitor.capture_image().unwrap();
     println!("Time To Capture: {:?}", start.elapsed());
     let out_file = String::from("debug.jpg");
     let mut image = DynamicImage::ImageRgba8(image).into_rgb8();

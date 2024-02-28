@@ -6,5 +6,6 @@ pub enum NetworkMessage {
     StopTimer,
     ResetTimer,
     Ping,
-    Pong
+    Pong,
+    Connect,
 }

@@ -11,12 +11,11 @@ use gtk4 as gtk;
 use gtk::{glib, Label, ListBox, prelude::*};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::thread;
 use async_channel::Sender;
 use gtk4::gdk_pixbuf::{PixbufLoader};
-use gtk4::{gio, Image, ListStore, PolicyType, ScrolledWindow};
-use image::Delay;
+use gtk4::{Align, gio, Image, ListStore, PolicyType, ScrolledWindow};
 use message_io::network::{ToRemoteAddr, Transport};
-use regex::Match;
 use crate::network::messages::NetworkMessage;
 use crate::screenshot::capture_screen;
 use chrono::Local;
@@ -26,7 +25,8 @@ enum UpdateUI {
     SetTimer(String),
     StartTimer(Instant),
     DelayMeasured(Option<Duration>),
-    ResetTimer
+    ResetTimer,
+    Ping(Duration)
 }
 
 struct Measurement{
@@ -83,7 +83,15 @@ fn build_ui(application: &gtk::Application) {
         .height_request(32)
         .pixel_size(1)
         .build());
+    let label_text_ping = Label::builder()
+        .valign(Align::Start)
+        .build();
+    label_text_ping.set_text("Ping: ");
 
+    let label_ping = Label::builder()
+        .valign(Align::Start)
+        .build();
+    label_ping.set_text("-");
 
     let run_stopwatch = Arc::new(AtomicBool::new(false));
 
@@ -95,7 +103,7 @@ fn build_ui(application: &gtk::Application) {
         = Arc::new(network::networkmanager::NetworkManager::new());
 
     let network_connect = network.clone();
-    let network_server = network.clone();
+    let network_client_connect = network.clone();
     let network_ui_update = network.clone();
     let sender_start = sender.clone();
     let sender_capture = sender.clone();
@@ -109,9 +117,10 @@ fn build_ui(application: &gtk::Application) {
 
     start_button.connect_clicked(move |_| {
         network.send(NetworkMessage::StartTimer);
+        start_2(Instant::now());
         let sender_capture = Arc::clone(&sender_capture);
         capture_screen(sender_capture);
-        start_2(Instant::now());
+
 
     });
 
@@ -122,18 +131,20 @@ fn build_ui(application: &gtk::Application) {
     button_connect.connect_clicked(move |_| {
 
         let sender = Arc::clone(&sender_connect);
-
-        network_connect.connect(true, Transport::Udp,
+        let network_client_connect = Arc::clone(&network_client_connect);
+        network_client_connect.connect(true, Transport::Udp,
                                 addr2.text().as_str().to_remote_addr().unwrap(), sender);
         set_image(status_image_clone.deref(), IMAGE_BYTES_CLIENT);
     });
 
     let addr3 = addr.clone();
     let status_image_3 = Arc::clone(&status_image);
+
     button_listen.connect_clicked(move |_| {
 
         let sender = Arc::clone(&sender);
-        network_server.connect(false, Transport::Udp,
+        let network_connect = Arc::clone(&network_connect);
+        network_connect.connect(false, Transport::Udp,
                                addr3.text().as_str().to_remote_addr().unwrap(), sender);
         set_image(status_image_3.deref(), IMAGE_BYTES_SERVER);
     });
@@ -148,6 +159,8 @@ fn build_ui(application: &gtk::Application) {
     grid.attach(&button_connect, 0, 3, 1, 1);
     grid.attach(&button_listen, 1, 3, 1, 1);
     grid.attach(&scrolled_window,4,0,3,4);
+    grid.attach(&label_text_ping,0,5,1,1);
+    grid.attach(&label_ping,1,5,1,1);
     // Spawn a future on main context and set the text buffer text from here
     glib::MainContext::default().spawn_local(async move {
         while let Ok(message) = receiver.recv().await {
@@ -173,6 +186,9 @@ fn build_ui(application: &gtk::Application) {
                     }
 
                 }
+                UpdateUI::Ping(p) => {
+                    label_ping.set_text(format!("{:?}",p).as_str());
+                }
             }
         }
     });
@@ -189,9 +205,9 @@ fn set_image(image: &Image, image_data: &[u8]){
 fn start_timer(run_stopwatch: Arc<AtomicBool>, sender: Arc<Sender<UpdateUI>>, inst: Instant) {
     run_stopwatch.store(true,Ordering::Relaxed);
 
-        gio::spawn_blocking(move || {
-            timer_update(sender, run_stopwatch, inst);
-        });
+    thread::spawn(move || {
+        timer_update(sender, run_stopwatch, inst);
+    });
 
 }
 
@@ -228,7 +244,7 @@ fn timer_update(sender: Arc<Sender<UpdateUI>>, run: Arc<AtomicBool>, inst: Insta
         }
         let _ = sender.deref().send_blocking(UpdateUI::SetTimer(elapsed_to_string(&inst)))
             .expect("timer channel closed");
-        sleep(std::time::Duration::from_millis(1));
+        sleep(Duration::from_millis(4));
     }
 
 }
