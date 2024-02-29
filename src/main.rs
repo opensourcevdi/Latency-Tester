@@ -14,24 +14,20 @@ use std::sync::Arc;
 use std::thread;
 use async_channel::Sender;
 use gtk4::gdk_pixbuf::{PixbufLoader};
-use gtk4::{Align, gio, Image, ListStore, PolicyType, ScrolledWindow};
+use gtk4::{Align, Image, PolicyType, ScrolledWindow};
 use message_io::network::{ToRemoteAddr, Transport};
 use crate::network::messages::NetworkMessage;
-use crate::screenshot::capture_screen;
+use crate::screenshot::{capture_screen, CaptureBox};
 use chrono::Local;
 
 enum UpdateUI {
-
     SetTimer(String),
     StartTimer(Instant),
     DelayMeasured(Option<Duration>),
     ResetTimer,
-    Ping(Duration)
+    Ping(Duration),
 }
 
-struct Measurement{
-
-}
 
 pub static IMAGE_BYTES_SERVER: &'static [u8] = include_bytes!("resources/server.jpg");
 pub static IMAGE_BYTES_CLIENT: &'static [u8] = include_bytes!("resources/desktop.jpg");
@@ -63,8 +59,8 @@ fn build_ui(application: &gtk::Application) {
     window.set_child(Some(&grid));
 
     let time = elapsed_to_string(&Instant::now());
-    let label = Label::default();
-    label.set_text(&time);
+    let label_timer = Label::default();
+    label_timer.set_text(&time);
 
     let start_button = gtk::Button::builder()
         .label("Start")
@@ -78,7 +74,7 @@ fn build_ui(application: &gtk::Application) {
     let button_listen = gtk::Button::builder()
         .label("Listen")
         .build();
-    let status_image = Arc::new( Image::builder()
+    let status_image = Arc::new(Image::builder()
         .width_request(32)
         .height_request(32)
         .pixel_size(1)
@@ -115,13 +111,17 @@ fn build_ui(application: &gtk::Application) {
     };
     let start_2 = start_t.clone();
 
+    let label_timer_capture = label_timer.clone();
     start_button.connect_clicked(move |_| {
         network.send(NetworkMessage::StartTimer);
         start_2(Instant::now());
         let sender_capture = Arc::clone(&sender_capture);
-        capture_screen(sender_capture);
 
-
+        let capture_box = Arc::new(CaptureBox::new((label_timer_capture.width() as f32 * 1.1) as i32,
+                                                   (label_timer_capture.height() as f32 * 1.1) as i32,
+                                                   -((label_timer_capture.width() as f32 + 32.0) * 1.05) as i32,
+                                                   0));
+        capture_screen(sender_capture, capture_box);
     });
 
     let sender_connect = sender.clone();
@@ -129,11 +129,10 @@ fn build_ui(application: &gtk::Application) {
 
     let status_image_clone = Arc::clone(&status_image);
     button_connect.connect_clicked(move |_| {
-
         let sender = Arc::clone(&sender_connect);
         let network_client_connect = Arc::clone(&network_client_connect);
         network_client_connect.connect(true, Transport::Udp,
-                                addr2.text().as_str().to_remote_addr().unwrap(), sender);
+                                       addr2.text().as_str().to_remote_addr().unwrap(), sender);
         set_image(status_image_clone.deref(), IMAGE_BYTES_CLIENT);
     });
 
@@ -141,53 +140,48 @@ fn build_ui(application: &gtk::Application) {
     let status_image_3 = Arc::clone(&status_image);
 
     button_listen.connect_clicked(move |_| {
-
         let sender = Arc::clone(&sender);
         let network_connect = Arc::clone(&network_connect);
         network_connect.connect(false, Transport::Udp,
-                               addr3.text().as_str().to_remote_addr().unwrap(), sender);
+                                addr3.text().as_str().to_remote_addr().unwrap(), sender);
         set_image(status_image_3.deref(), IMAGE_BYTES_SERVER);
     });
 
 
-    let (scrolled_window, list_box) =add_delay_listbox();
+    let (scrolled_window, list_box) = add_delay_listbox();
 
-    grid.attach(&label, 0, 0, 1, 1);
+    grid.attach(&label_timer, 0, 0, 1, 1);
     grid.attach(status_image.deref(), 1, 0, 1, 1);
     grid.attach(&start_button, 1, 1, 1, 1);
     grid.attach(&addr, 0, 2, 2, 1);
     grid.attach(&button_connect, 0, 3, 1, 1);
     grid.attach(&button_listen, 1, 3, 1, 1);
-    grid.attach(&scrolled_window,4,0,3,4);
-    grid.attach(&label_text_ping,0,5,1,1);
-    grid.attach(&label_ping,1,5,1,1);
+    grid.attach(&scrolled_window, 4, 0, 3, 4);
+    grid.attach(&label_text_ping, 0, 5, 1, 1);
+    grid.attach(&label_ping, 1, 5, 1, 1);
     // Spawn a future on main context and set the text buffer text from here
     glib::MainContext::default().spawn_local(async move {
         while let Ok(message) = receiver.recv().await {
             match message {
-                UpdateUI::SetTimer(text) => { label.set_text(text.as_str()); }
+                UpdateUI::SetTimer(text) => { label_timer.set_text(text.as_str()); }
                 UpdateUI::StartTimer(inst) => { start_t(inst); }
-                UpdateUI::ResetTimer=> {
-                    run_stopwatch.store(false,Ordering::Relaxed);
+                UpdateUI::ResetTimer => {
+                    run_stopwatch.store(false, Ordering::Relaxed);
                 }
                 UpdateUI::DelayMeasured(x) => {
-                    run_stopwatch.store(false,Ordering::Relaxed);
+                    run_stopwatch.store(false, Ordering::Relaxed);
                     network_ui_update.send(NetworkMessage::ResetTimer);
                     match x {
-
-                        None => {
-
-                        }
+                        None => {}
                         Some(d) => {
-                            let label = Label::new(Some(format!("{}: {:?}",Local::now().format("%X"),d).as_str()));
+                            let label = Label::new(Some(format!("{}: {:?}", Local::now().format("%X"), d).as_str()));
 
                             list_box.append(&label);
                         }
                     }
-
                 }
                 UpdateUI::Ping(p) => {
-                    label_ping.set_text(format!("{:?}",p).as_str());
+                    label_ping.set_text(format!("{:?}", p).as_str());
                 }
             }
         }
@@ -195,28 +189,24 @@ fn build_ui(application: &gtk::Application) {
     window.present();
 }
 
-fn set_image(image: &Image, image_data: &[u8]){
+fn set_image(image: &Image, image_data: &[u8]) {
     let loader = PixbufLoader::with_type("jpeg").unwrap();
     loader.write(image_data).unwrap();
     loader.close().unwrap();
     let pixbuf = loader.pixbuf().unwrap();
     image.set_from_pixbuf(Some(&pixbuf));
 }
+
 fn start_timer(run_stopwatch: Arc<AtomicBool>, sender: Arc<Sender<UpdateUI>>, inst: Instant) {
-    run_stopwatch.store(true,Ordering::Relaxed);
+    run_stopwatch.store(true, Ordering::Relaxed);
 
     thread::spawn(move || {
         timer_update(sender, run_stopwatch, inst);
     });
-
 }
 
 
 fn add_delay_listbox() -> (ScrolledWindow, ListBox) {
-
-
-
-
     let listbox = ListBox::builder()
         .build();
 
@@ -232,9 +222,6 @@ fn add_delay_listbox() -> (ScrolledWindow, ListBox) {
 }
 
 
-
-
-
 fn timer_update(sender: Arc<Sender<UpdateUI>>, run: Arc<AtomicBool>, inst: Instant) {
     loop {
         if !run.load(Ordering::Relaxed) {
@@ -246,7 +233,6 @@ fn timer_update(sender: Arc<Sender<UpdateUI>>, run: Arc<AtomicBool>, inst: Insta
             .expect("timer channel closed");
         sleep(Duration::from_millis(4));
     }
-
 }
 
 fn elapsed_to_string(instant: &Instant) -> String {

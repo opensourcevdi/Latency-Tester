@@ -91,7 +91,7 @@ impl NetworkManager {
                 listener.for_each(move |event| {
                     match event {
                         NodeEvent::Network(net_event) => match net_event {
-                            NetEvent::Connected(e, _) => {
+                            NetEvent::Connected(_, _) => {
                                 if matches!(mode.deref().lock().unwrap().deref(), Mode::Client(_)) {
                                     {
                                         handler.signals().send(Signal::Greet);

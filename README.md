@@ -4,8 +4,10 @@ A tool for measuring the delay of remote displays.
 ### Dependency's
 
 ```bash
-sudo apt-get install libleptonica-dev libtesseract-dev clang
-sudo apt-get install tesseract-ocr-eng
+sudo apt install libleptonica-dev libtesseract-dev clang
+sudo apt install tesseract-ocr-eng
+sudo apt install libgtk-4-dev
+sudo apt install libclang-dev
 ```
 
 ### Usage
