@@ -1,4 +1,6 @@
 mod screenshot;
+mod config;
+
 mod network {
     pub mod networkmanager;
     pub mod messages;
@@ -10,7 +12,7 @@ use std::time::{Duration, Instant};
 use gtk4 as gtk;
 use gtk::{glib, Label, ListBox, prelude::*};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use async_channel::Sender;
 use gtk4::gdk_pixbuf::{PixbufLoader};
@@ -19,6 +21,8 @@ use message_io::network::{ToRemoteAddr, Transport};
 use crate::network::messages::NetworkMessage;
 use crate::screenshot::{capture_screen, CaptureBox};
 use chrono::Local;
+use glib::Propagation;
+use crate::config::{read_config, write_config};
 
 enum UpdateUI {
     SetTimer(String),
@@ -31,16 +35,20 @@ enum UpdateUI {
 
 pub static IMAGE_BYTES_SERVER: &'static [u8] = include_bytes!("resources/server.jpg");
 pub static IMAGE_BYTES_CLIENT: &'static [u8] = include_bytes!("resources/desktop.jpg");
+const APP_ID: &str = "de.uni-freiburg.rz.latency_test";
+const CONFIG_PATH: &str = "latency_reader.toml";
 
 fn main() -> glib::ExitCode {
     let application = gtk::Application::builder()
-        .application_id("de.rz.latency_test")
+        .application_id(APP_ID)
         .build();
     application.connect_activate(build_ui);
     application.run()
 }
 
 fn build_ui(application: &gtk::Application) {
+    let config = read_config(CONFIG_PATH);
+    let config = Mutex::new(config.expect("error reading config"));
     let window = gtk::ApplicationWindow::new(application);
     window.set_title(Some("Latency Tester"));
     window.set_default_size(600, 300);
@@ -65,8 +73,13 @@ fn build_ui(application: &gtk::Application) {
     let start_button = gtk::Button::builder()
         .label("Start")
         .build();
+    let addr_setting;
+    {
+        let binding = config.lock().unwrap();
+        addr_setting = binding.address.clone();
+    }
     let addr = gtk::Entry::builder()
-        .text("127.0.0.1:4999")
+        .text(addr_setting)
         .build();
     let button_connect = gtk::Button::builder()
         .label("Connect")
@@ -185,6 +198,12 @@ fn build_ui(application: &gtk::Application) {
                 }
             }
         }
+    });
+    window.connect_close_request(move |_| {
+        let mut config = config.lock().unwrap();
+        config.address = String::from(addr.text());
+        let _ = write_config(&config, CONFIG_PATH);
+        Propagation::Proceed
     });
     window.present();
 }
