@@ -45,7 +45,6 @@ pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>, capture_box:Arc<Cap
                 match capture(monitor, capture_box.deref()) {
                     None => {println!("capture failed");}
                     Some(delay) => {
-                        //TODO display
                         println!("Delay: {:?}",delay);
                         let _ = sender_capture.send_blocking(UpdateUI::DelayMeasured(Some(delay)));
                         break;
@@ -65,49 +64,56 @@ fn capture(monitor: &Monitor, capture_box:&CaptureBox) -> Option<Duration> {
     println!("Time To Capture: {:?}", start.elapsed());
     let out_file = String::from("debug.jpg");
     let mut image = DynamicImage::ImageRgba8(image).into_rgb8();
-    let mut timer_durations = vec![];
-    let mut x= 0;
-    let mut y= 0;
+    let mut results = vec![];
+    let mut ok = true;
     for p in [crate::IMAGE_BYTES_SERVER, crate::IMAGE_BYTES_CLIENT]
     {
         let res = find_timer_spect(p);
         match res {
-            Some((rx, ry, _w, _h, confidence)) => {
+            Some((x, y, _w, _h, confidence)) => {
                 println!("Image found at {}, {} with confidence {}", x, y, confidence);
 
-                x = (rx as i32 + capture_box.x_offset)as u32;
-                y = (ry as i32 + capture_box.y_offset) as u32;
+                let x = (x as i32 + capture_box.x_offset) as u32;
+                let y = (y as i32 + capture_box.y_offset) as u32;
                 let duration =
                     ocr(image.sub_image(x, y, capture_box.width as u32, capture_box.height as u32).to_image());
 
                 match duration {
-                    Ok(d) => {timer_durations.push(d);}
+                    Ok(d) => {results.push((Some(d),x,y));}
                     Err(e) => {
+                        results.push((None,x,y));
                         println!("Error ocr: {:?}",e);
+                        ok = false;
                     }
                 }
             }
-            None => { println!("Image not found");
+            None => {
+                println!("Image not found");
+                ok = false;
             }
         }
     }
-    save_debug_image(&mut image,out_file,MAX_TRIES,x,y,&capture_box);
-    if timer_durations.len() != 2 {
+    save_debug_image(&mut image,out_file,MAX_TRIES,&results,&capture_box);
+    if !ok {
         return None;
     }
-    if timer_durations[0].as_nanos() == 0 || timer_durations[1].as_nanos() == 0 {
+
+    if results[0].0.unwrap().as_nanos() == 0 || results[1].0.unwrap().as_nanos() == 0 {
         return None;
     }
-    let delay =duration_sub(timer_durations[0],timer_durations[1]);
+    let delay = duration_sub(results[0].0.unwrap(),results[1].0.unwrap());
     Some(delay)
 }
 
-fn save_debug_image(image: &mut RgbImage, path:String, tries:i32, x:u32, y:u32, capture_box:& CaptureBox){
-    draw_rectangle_on(
-        image,
-        (x , y ),
-        (capture_box.width as u32, capture_box.height as u32),
-    );
+fn save_debug_image(image: &mut RgbImage, path:String, tries:i32, results:&Vec<(Option<Duration>,u32,u32)>, capture_box:& CaptureBox){
+    for i in results{
+        draw_rectangle_on(
+            image,
+            (i.1 , i.2 ),
+            (capture_box.width as u32, capture_box.height as u32),
+        );
+    }
+
     if CREATE_DEBUG_IMAGE && tries >= MAX_TRIES {
         image.save(path).unwrap();
     }
