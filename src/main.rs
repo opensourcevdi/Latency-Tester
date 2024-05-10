@@ -1,3 +1,4 @@
+#![windows_subsystem = "windows"]
 mod screenshot;
 mod config;
 
@@ -9,20 +10,19 @@ mod network {
 use std::ops::Deref;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use gtk4 as gtk;
 use gtk::{glib, Label, ListBox, prelude::*};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use async_channel::Sender;
-use gtk4::gdk_pixbuf::{PixbufLoader};
-use gtk4::{Align, Image, PolicyType, ScrolledWindow};
+use gtk::gdk_pixbuf::{PixbufLoader};
+use gtk::{Align, Image, PolicyType, ScrolledWindow};
 use message_io::network::{ToRemoteAddr, Transport};
 use crate::network::messages::NetworkMessage;
 use crate::screenshot::{capture_screen, CaptureBox};
 use chrono::Local;
-use glib::Propagation;
 use crate::config::{read_config, write_config};
+
 
 enum UpdateUI {
     SetTimer(String),
@@ -50,7 +50,7 @@ fn build_ui(application: &gtk::Application) {
     let config = read_config(CONFIG_PATH);
     let config = Mutex::new(config.expect("error reading config"));
     let window = gtk::ApplicationWindow::new(application);
-    window.set_title(Some("Latency Tester"));
+    window.set_title("Latency Tester");
     window.set_default_size(600, 300);
     let grid = gtk::Grid::builder()
         .margin_start(20)
@@ -69,7 +69,6 @@ fn build_ui(application: &gtk::Application) {
     let time = elapsed_to_string(&Instant::now());
     let label_timer = Label::default();
     label_timer.set_text(&time);
-
     let start_button = gtk::Button::builder()
         .label("Start")
         .build();
@@ -101,7 +100,6 @@ fn build_ui(application: &gtk::Application) {
         .valign(Align::Start)
         .build();
     label_ping.set_text("-");
-
     let run_stopwatch = Arc::new(AtomicBool::new(false));
 
     let (sender, receiver)
@@ -130,16 +128,15 @@ fn build_ui(application: &gtk::Application) {
         start_2(Instant::now());
         let sender_capture = Arc::clone(&sender_capture);
 
-        let capture_box = Arc::new(CaptureBox::new((label_timer_capture.width() as f32 * 1.1) as i32,
-                                                   (label_timer_capture.height() as f32 * 1.1) as i32,
-                                                   -((label_timer_capture.width() as f32 + 32.0) * 1.05) as i32,
+        let capture_box = Arc::new(CaptureBox::new((label_timer_capture.allocated_width() as f32 * 1.1) as i32,
+                                                   (label_timer_capture.allocated_height() as f32 * 1.1) as i32,
+                                                   -((label_timer_capture.allocated_width() as f32 + 32.0) * 1.05) as i32,
                                                    0));
         capture_screen(sender_capture, capture_box);
     });
 
     let sender_connect = sender.clone();
     let addr2 = addr.clone();
-
     let status_image_clone = Arc::clone(&status_image);
     button_connect.connect_clicked(move |_| {
         let sender = Arc::clone(&sender_connect);
@@ -189,7 +186,8 @@ fn build_ui(application: &gtk::Application) {
                         Some(d) => {
                             let label = Label::new(Some(format!("{}: {:?}", Local::now().format("%X"), d).as_str()));
 
-                            list_box.append(&label);
+                            list_box.prepend(&label);
+                            label.show();
                         }
                     }
                 }
@@ -199,13 +197,12 @@ fn build_ui(application: &gtk::Application) {
             }
         }
     });
-    window.connect_close_request(move |_| {
+    window.connect_destroy(move |_| {
         let mut config = config.lock().unwrap();
         config.address = String::from(addr.text());
         let _ = write_config(&config, CONFIG_PATH);
-        Propagation::Proceed
     });
-    window.present();
+    window.show_all();
 }
 
 fn set_image(image: &Image, image_data: &[u8]) {
@@ -236,7 +233,7 @@ fn add_delay_listbox() -> (ScrolledWindow, ListBox) {
         .min_content_width(200)
         .child(&listbox)
         .build();
-    scrolled_window.set_child(Some(&listbox));
+    scrolled_window.add(&listbox);
     (scrolled_window, listbox)
 }
 

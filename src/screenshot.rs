@@ -11,6 +11,7 @@ use leptess::{LepTess, Variable};
 use regex::Regex;
 use xcap::Monitor;
 use crate::UpdateUI;
+#[path = "spectrust.rs"] mod spectrust;
 
 const MAX_TRIES:i32 = 3;
 const SCREENSHOT_DELAY_NS:u32 = 2_000_000_000; // 2 sec
@@ -60,15 +61,21 @@ pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>, capture_box:Arc<Cap
 
 fn capture(monitor: &Monitor, capture_box:&CaptureBox) -> Option<Duration> {
     let start = Instant::now();
-    let image =monitor.capture_image().unwrap();
+    let image = match monitor.capture_image(){
+        Ok(x) => x,
+        Err(_) =>{
+            println!("Error on image capture");
+            return None},
+    };
     println!("Time To Capture: {:?}", start.elapsed());
     let out_file = String::from("debug.jpg");
-    let mut image = DynamicImage::ImageRgba8(image).into_rgb8();
+    let image = DynamicImage::ImageRgba8(image);
+    let mut output_image = image.clone().into_rgb8();
     let mut results = vec![];
     let mut ok = true;
     for p in [crate::IMAGE_BYTES_SERVER, crate::IMAGE_BYTES_CLIENT]
     {
-        let res = find_timer_spect(p);
+        let res = find_timer_spect(&image,p);
         match res {
             Some((x, y, _w, _h, confidence)) => {
                 println!("Image found at {}, {} with confidence {}", x, y, confidence);
@@ -76,7 +83,7 @@ fn capture(monitor: &Monitor, capture_box:&CaptureBox) -> Option<Duration> {
                 let x = (x as i32 + capture_box.x_offset) as u32;
                 let y = (y as i32 + capture_box.y_offset) as u32;
                 let duration =
-                    ocr(image.sub_image(x, y, capture_box.width as u32, capture_box.height as u32).to_image());
+                    ocr(output_image.sub_image(x, y, capture_box.width as u32, capture_box.height as u32).to_image());
 
                 match duration {
                     Ok(d) => {results.push((Some(d),x,y));}
@@ -88,12 +95,12 @@ fn capture(monitor: &Monitor, capture_box:&CaptureBox) -> Option<Duration> {
                 }
             }
             None => {
-                println!("Image not found");
+                println!("Could not locate program window");
                 ok = false;
             }
         }
     }
-    save_debug_image(&mut image,out_file,MAX_TRIES,&results,&capture_box);
+    save_debug_image(&mut output_image, out_file, MAX_TRIES, &results, &capture_box);
     if !ok {
         return None;
     }
@@ -135,7 +142,7 @@ fn ocr(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<Duration,String> {
     let mut tiff_buffer = Vec::new();
     image.write_to(
         &mut Cursor::new(&mut tiff_buffer),
-        image::ImageOutputFormat::Tiff,
+        image::ImageFormat::Tiff,
     )
         .unwrap();
     lt.set_variable(Variable::TesseditCharWhitelist,"0123456789.:").expect("error setting tesseract whitelist");
@@ -168,12 +175,11 @@ fn ocr(image: ImageBuffer<Rgb<u8>, Vec<u8>>) -> Result<Duration,String> {
     Ok(time)
 }
 
-fn find_timer_spect(pattern: &[u8]) -> Option<(u32, u32, u32, u32, f32)> {
+fn find_timer_spect(screenshot: &DynamicImage, pattern: &[u8]) -> Option<(u32, u32, u32, u32, f32)> {
     let img = image::load_from_memory_with_format(pattern, ImageFormat::Jpeg).unwrap();
-    let region = None;
     let min_confidence = Some(0.9);
     let tolerance = Some(10);
-    let res = spectrust::locate_image(&img, region, min_confidence, tolerance);
+    let res = spectrust::locate_image(&screenshot,&img, min_confidence, tolerance);
     return res;
 }
 
