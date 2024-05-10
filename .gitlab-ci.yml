@@ -110,8 +110,8 @@ build-job:
       gtk-xft-rgba = rgb
       gtk-xft-antialias = 1
       EOF
-    - mingw-strip out/*.dll
-    - mingw-strip out/*.exe
+    - mingw-strip $out/*.dll
+    - mingw-strip $out/*.exe
   artifacts:
     paths: 
       - package_windows
