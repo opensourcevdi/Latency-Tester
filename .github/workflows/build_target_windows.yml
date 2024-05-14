@@ -1,6 +1,8 @@
-name: run gitlab pipelines
-on: [push]
-
+name: build windows release
+on:
+  push:
+    tags:
+      - '*'
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -9,7 +11,7 @@ jobs:
         uses: actions/checkout@v4
       - uses: OpenSourceVDI/gitlab-ci-run@HEAD
       - name: Uploading package_windows
-        uses: actions/upload-artifact@v4
+        uses: ncipollo/release-action@v1
         with:
-          name: package_windows
-          path: package_windows
+          artifacts: "package_windows"
+
