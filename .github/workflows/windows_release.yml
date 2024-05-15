@@ -1,0 +1,21 @@
+name: build windows release
+on:
+  push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+      - uses: OpenSourceVDI/gitlab-ci-run@HEAD
+      - run:  zip -r package_windows.zip package_windows
+      - name: Uploading package_windows
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "package_windows.zip"
+          allowUpdates: true
+          replacesArtifacts: true
+          tag: "latest"
