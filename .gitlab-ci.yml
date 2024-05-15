@@ -90,8 +90,9 @@ build-job:
     - mkdir -p $out/share/glib-2.0/schemas/
     - cp -T $MINGW_PREFIX/share/glib-2.0/schemas/gschemas.compiled $out/share/glib-2.0/schemas/gschemas.compiled
     # Pixbuf stuff, in order to get SVGs (scalable icons) to load
-    - mkdir -p $out/lib/gdk-pixbuf-2.0
-    - cp -rT $MINGW_PREFIX/lib/gdk-pixbuf-2.0 $out/lib/gdk-pixbuf-2.0
+    # currently causes a crash
+    #- mkdir -p $out/lib/gdk-pixbuf-2.0
+    #- cp -rT $MINGW_PREFIX/lib/gdk-pixbuf-2.0 $out/lib/gdk-pixbuf-2.0
 
 
     - for DLL in $(peldd $out/*.exe -t --ignore-errors);
