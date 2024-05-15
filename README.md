@@ -22,7 +22,7 @@ cargo build --release
 
 ##### Windows
 
-Use the prebuild binaries from the [build-job](https://gitlab.rz.uni-freiburg.de/opensourcevdi/latency-tester/-/jobs).
+Use the prebuild binaries from the [gitlab build-job](https://gitlab.rz.uni-freiburg.de/opensourcevdi/latency-tester/-/jobs) or [latest github release](https://github.com/OpenSourceVDI/Latency-Tester/releases/tag/latest).
 
 
 ### Usage
