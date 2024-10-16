@@ -22,7 +22,7 @@ cargo build --release
 
 ##### Windows
 
-Use the prebuild binaries from the [gitlab build-job](https://gitlab.rz.uni-freiburg.de/opensourcevdi/latency-tester/-/jobs) or [latest github release](https://github.com/OpenSourceVDI/Latency-Tester/releases/tag/latest).
+Use the prebuild binaries from the [gitlab build-job](https://gitlab.uni-freiburg.de/opensourcevdi/latency-tester/-/jobs) or [latest github release](https://github.com/OpenSourceVDI/Latency-Tester/releases/tag/latest).
 
 
 ### Usage
@@ -36,7 +36,6 @@ Use the prebuild binaries from the [gitlab build-job](https://gitlab.rz.uni-frei
 
 
 ### Known Issues
-- only works on first Monitor.
 - only works if both instances are not scaled (the remote desktop image must not be scaled either).
 - start can be pressed multiple times.
 - No Error Handling (if the program crashes run im from terminal to see what's wrong).
