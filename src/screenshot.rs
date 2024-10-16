@@ -35,12 +35,16 @@ impl CaptureBox {
     }
 }
 
-pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>, capture_box:Arc<CaptureBox>) {
+pub fn get_monitors() -> Vec<Monitor> {
+     xcap::Monitor::all().unwrap()
+}
+
+pub fn capture_screen(sender_capture: Arc<Sender<UpdateUI>>, capture_box:Arc<CaptureBox>, monitor_num: usize) {
     let _ = thread::spawn({
         move || {
             thread::sleep(Duration::new(0, SCREENSHOT_DELAY_NS));
-            let binding = xcap::Monitor::all().unwrap();
-            let monitor = binding.first().unwrap();
+            let binding = get_monitors();
+            let monitor = &binding.get(monitor_num).unwrap();
             for _i in 0.. MAX_TRIES+1 {
                 let start = Instant::now();
                 match capture(monitor, capture_box.deref()) {

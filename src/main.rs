@@ -19,7 +19,7 @@ use gtk::gdk_pixbuf::{PixbufLoader};
 use gtk::{Align, Image, PolicyType, ScrolledWindow};
 use message_io::network::{ToRemoteAddr, Transport};
 use crate::network::messages::NetworkMessage;
-use crate::screenshot::{capture_screen, CaptureBox};
+use crate::screenshot::{capture_screen, get_monitors, CaptureBox};
 use chrono::Local;
 use crate::config::{read_config, write_config};
 
@@ -100,6 +100,9 @@ fn build_ui(application: &gtk::Application) {
         .valign(Align::Start)
         .build();
     label_ping.set_text("-");
+    let label_monitor = Label::builder()
+        .label("Monitors:")
+        .build();
     let run_stopwatch = Arc::new(AtomicBool::new(false));
 
     let (sender, receiver)
@@ -120,9 +123,20 @@ fn build_ui(application: &gtk::Application) {
         let sender_start = Arc::clone(&sender_start);
         start_timer(run_stopwatch, sender_start, inst);
     };
+
+    let montiros = get_monitors();
+    let combobox_monitors= Arc::new(gtk::ComboBoxText::builder()
+        .build());
+
+    for monitor in montiros {
+        combobox_monitors.deref().append_text(monitor.name());
+    }
+    combobox_monitors.deref().set_active(Some(0));
+
     let start_2 = start_t.clone();
 
     let label_timer_capture = label_timer.clone();
+    let combobox_monitors_clone = Arc::clone(&combobox_monitors);
     start_button.connect_clicked(move |_| {
         network.send(NetworkMessage::StartTimer);
         start_2(Instant::now());
@@ -132,7 +146,7 @@ fn build_ui(application: &gtk::Application) {
                                                    (label_timer_capture.allocated_height() as f32 * 1.1) as i32,
                                                    -((label_timer_capture.allocated_width() as f32 + 32.0) * 1.05) as i32,
                                                    0));
-        capture_screen(sender_capture, capture_box);
+        capture_screen(sender_capture, capture_box,combobox_monitors_clone.active().unwrap() as usize);
     });
 
     let sender_connect = sender.clone();
@@ -169,6 +183,8 @@ fn build_ui(application: &gtk::Application) {
     grid.attach(&scrolled_window, 4, 0, 3, 4);
     grid.attach(&label_text_ping, 0, 5, 1, 1);
     grid.attach(&label_ping, 1, 5, 1, 1);
+    grid.attach(&label_monitor, 0, 6, 1, 1);
+    grid.attach(combobox_monitors.deref(), 1, 6, 4, 1);
     // Spawn a future on main context and set the text buffer text from here
     glib::MainContext::default().spawn_local(async move {
         while let Ok(message) = receiver.recv().await {
