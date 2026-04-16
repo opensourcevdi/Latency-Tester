@@ -72,6 +72,7 @@ build-job:
     #build
     #
     - cd $ltsrc
+    - cargo build --release
     - cargo build --target=x86_64-pc-windows-gnu --release
     #
     # package 
