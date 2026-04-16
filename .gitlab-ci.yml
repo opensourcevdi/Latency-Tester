@@ -29,8 +29,8 @@ build-job:
     #
     # Install Linux libraries
     #
-    - sudo apt install libleptonica-dev libtesseract-dev clang
-        tesseract-ocr-eng libgtk-3-dev libclang-dev
+    - dnf install -y leptonica-devel tesseract-devel clang
+        tesseract-langpack-eng gtk3-devel clang-devel
 
     #
     # Install Windows libraries
