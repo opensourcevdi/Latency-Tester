@@ -27,6 +27,12 @@ build-job:
     - chmod +x /usr/bin/peldd
 
     #
+    # Install Linux libraries
+    #
+    - sudo apt install libleptonica-dev libtesseract-dev clang
+        tesseract-ocr-eng libgtk-3-dev libclang-dev
+
+    #
     # Install Windows libraries
     #
     - dnf install -y mingw64-gcc
