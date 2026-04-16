@@ -78,20 +78,20 @@ build-job:
     #build
     #
     - cd $ltsrc
+    - mkdir -p package_windows
+    - out=$(realpath package_windows)
     - cargo build --release
+    # Add Linux binary
+    - cp target/x86_64-pc-windows-gnu/release/latency_tester $out
     - cargo build --target=x86_64-pc-windows-gnu --release
     #
     # package 
     #
-    - mkdir -p package_windows
-    - out=$(realpath package_windows)
     # Add gdbus (https://discourse.gnome.org/t/gtk-warning-about-gdbus-exe-not-being-found-on-windows-msys2/2893/2)
     - cp $MINGW_PREFIX/bin/gdbus.exe $out
     # Add gspawn binaries for launching external processes (https://gitlab.gnome.org/GNOME/glib/-/issues/2843#note_1625472)
     - cp $MINGW_PREFIX/bin/gspawn-win64-helper-console.exe $MINGW_PREFIX/bin/gspawn-win64-helper.exe $out
     - cp target/x86_64-pc-windows-gnu/release/*.exe $out
-    # Add Linux binary
-    - cp target/x86_64-pc-windows-gnu/release/latency_tester $out
     # Handle the glib schema compilation as well
     - glib-compile-schemas $MINGW_PREFIX/share/glib-2.0/schemas/
     - mkdir -p $out/share/glib-2.0/schemas/
